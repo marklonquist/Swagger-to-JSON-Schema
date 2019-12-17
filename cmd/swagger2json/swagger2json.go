@@ -74,7 +74,6 @@ func generateJsonSchema(inputFile, outputFolder string, pretty bool) {
 		log.Fatal("3", err)
 	}
 
-	refs := make(map[string]string)
 	result := make(map[string]Schema)
 	for k, v := range spec.Definitions {
 		jsonSchema := Schema{}
@@ -83,18 +82,36 @@ func generateJsonSchema(inputFile, outputFolder string, pretty bool) {
 		jsonSchema.Title = k
 		jsonSchema.Type.Type = v.Type[0]
 
+		ordered := make([]OrderedType, len(v.Properties))
 		for k2, v2 := range v.Properties {
-			t := &Type{}
+			order := int(v2.Extensions["x-order"].(float64))
+			ordered[order] = OrderedType{
+				Name:   k2,
+				Schema: v2,
+			}
+		}
 
-			if len(v2.Type) > 0 {
-				t.Type = v2.Type[0]
-				jsonSchema.Properties[k2] = t
+		for i, v2 := range ordered {
+			t := &Type{}
+			t.PropertyOrder = i + 1
+
+			if len(v2.Schema.Type) > 0 {
+				t.Type = v2.Schema.Type[0]
+				if t.Type == "array" {
+					splitted := strings.Split(v2.Schema.Items.Schema.Ref.String(), "/")
+					if len(splitted) == 1 {
+						continue
+					}
+					f := splitted[2]
+					t.Items = handleRef(f, spec.Definitions, i)
+				}
+
+				jsonSchema.Properties[v2.Name] = t
 			} else {
 				// is a $ref
-				splitted := strings.Split(v2.Ref.String(), "/")
+				splitted := strings.Split(v2.Schema.Ref.String(), "/")
 				f := splitted[2]
-				jsonSchema.Properties[k2] = handleRef(f, spec.Definitions)
-				refs[f] = f
+				jsonSchema.Properties[v2.Name] = handleRef(f, spec.Definitions, i)
 			}
 		}
 
@@ -112,17 +129,13 @@ func generateJsonSchema(inputFile, outputFolder string, pretty bool) {
 		result[k] = jsonSchema
 	}
 
-	for k := range refs {
-		delete(result, k)
-	}
-
 	val := ""
 	if pretty {
 		marshalled, err := json.MarshalIndent(result, "", "	")
 		if err != nil {
 			log.Fatal("5", err)
 		}
-		val = "const schemas = " + string(marshalled)
+		val = "export const schemas = " + string(marshalled)
 	} else {
 		marshalled, err := json.Marshal(result)
 		if err != nil {
@@ -140,26 +153,45 @@ func generateJsonSchema(inputFile, outputFolder string, pretty bool) {
 	outputFile.WriteString(val)
 }
 
-func handleRef(ref string, definitions spec.Definitions) *Type {
+func handleRef(ref string, definitions spec.Definitions, order int) *Type {
 	t := &Type{}
+	t.PropertyOrder = order
 	t.Properties = make(map[string]*Type)
 
 	for k, v := range definitions {
 		if k == ref {
 			t.Type = v.Type[0]
 
+			ordered := make([]OrderedType, len(v.Properties))
 			for k2, v2 := range v.Properties {
+				order := int(v2.Extensions["x-order"].(float64))
+				ordered[order] = OrderedType{
+					Name:   k2,
+					Schema: v2,
+				}
+			}
+
+			for i, v2 := range ordered {
 				t1 := &Type{}
+				t1.PropertyOrder = i
 				t1.Properties = make(map[string]*Type)
 
-				if len(v2.Type) > 0 {
-					t1.Type = v2.Type[0]
-					t.Properties[k2] = t1
+				if len(v2.Schema.Type) > 0 {
+					t1.Type = v2.Schema.Type[0]
+					if t1.Type == "array" {
+						splitted := strings.Split(v2.Schema.Items.Schema.Ref.String(), "/")
+						if len(splitted) == 1 {
+							continue
+						}
+						f := splitted[2]
+						t1.Items = handleRef(f, definitions, i)
+					}
+					t.Properties[v2.Name] = t1
 				} else {
 					// is a $ref
-					splitted := strings.Split(v2.Ref.String(), "/")
+					splitted := strings.Split(v2.Schema.Ref.String(), "/")
 					f := splitted[2]
-					t.Properties[k2] = handleRef(f, definitions)
+					t.Properties[v2.Name] = handleRef(f, definitions, i)
 				}
 			}
 

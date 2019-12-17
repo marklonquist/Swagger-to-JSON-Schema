@@ -2,6 +2,8 @@ package main
 
 import "encoding/json"
 
+import "github.com/go-openapi/spec"
+
 type Schema struct {
 	*Type
 	Definitions Definitions `json:"definitions,omitempty"`
@@ -45,10 +47,16 @@ type Type struct {
 	Media                *Type            `json:"media,omitempty"`
 	BinaryEncoding       string           `json:"binaryEncoding,omitempty"`
 	Options              *Options         `json:"options,omitempty"`
+	PropertyOrder        int              `json:"propertyOrder,omitempty"`
 }
 
 type Definitions map[string]*Type
 
 type Options struct {
 	EnumTitles []string `json:"enum_titles,omitempty"`
+}
+
+type OrderedType struct {
+	Name   string
+	Schema spec.Schema
 }
