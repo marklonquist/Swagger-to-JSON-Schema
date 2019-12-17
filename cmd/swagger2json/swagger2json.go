@@ -84,7 +84,7 @@ func generateJsonSchema(inputFile, outputFolder string, pretty bool) {
 
 		ordered := make([]OrderedType, len(v.Properties))
 		for k2, v2 := range v.Properties {
-			order := int(v2.Extensions["x-order"].(float64))
+			order := int(v2.Extensions["x-position"].(float64))
 			ordered[order] = OrderedType{
 				Name:   k2,
 				Schema: v2,
@@ -164,7 +164,7 @@ func handleRef(ref string, definitions spec.Definitions, order int) *Type {
 
 			ordered := make([]OrderedType, len(v.Properties))
 			for k2, v2 := range v.Properties {
-				order := int(v2.Extensions["x-order"].(float64))
+				order := int(v2.Extensions["x-position"].(float64))
 				ordered[order] = OrderedType{
 					Name:   k2,
 					Schema: v2,
