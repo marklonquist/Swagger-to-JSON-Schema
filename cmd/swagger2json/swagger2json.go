@@ -182,6 +182,8 @@ func handleRef(ref string, definitions spec.Definitions, order int) *Type {
 				if len(v2.Schema.Type) > 0 {
 					t1.Type = v2.Schema.Type[0]
 					if t1.Type == "array" {
+						t1.Format = "tabs-top"
+						t1.PropertyOrder += 500
 						splitted := strings.Split(v2.Schema.Items.Schema.Ref.String(), "/")
 						if len(splitted) == 1 {
 							continue
