@@ -78,6 +78,7 @@ func generateJsonSchema(inputFile, outputFolder string, pretty bool) {
 	for k, v := range spec.Definitions {
 		jsonSchema := Schema{}
 		jsonSchema.Type = &Type{}
+		jsonSchema.Format = "grid-strict"
 		jsonSchema.Type.Properties = make(map[string]*Type)
 		jsonSchema.Title = k
 		jsonSchema.Type.Type = v.Type[0]
@@ -98,12 +99,14 @@ func generateJsonSchema(inputFile, outputFolder string, pretty bool) {
 			if len(v2.Schema.Type) > 0 {
 				t.Type = v2.Schema.Type[0]
 				if t.Type == "array" {
+					t.Format = "tabs-top"
+					t.PropertyOrder += 500
 					splitted := strings.Split(v2.Schema.Items.Schema.Ref.String(), "/")
 					if len(splitted) == 1 {
 						continue
 					}
 					f := splitted[2]
-					t.Items = handleRef(f, spec.Definitions, i)
+					t.Items = handleRef(f, spec.Definitions, i+1)
 				}
 
 				jsonSchema.Properties[v2.Name] = t
@@ -111,7 +114,7 @@ func generateJsonSchema(inputFile, outputFolder string, pretty bool) {
 				// is a $ref
 				splitted := strings.Split(v2.Schema.Ref.String(), "/")
 				f := splitted[2]
-				jsonSchema.Properties[v2.Name] = handleRef(f, spec.Definitions, i)
+				jsonSchema.Properties[v2.Name] = handleRef(f, spec.Definitions, i+1)
 			}
 		}
 
@@ -144,7 +147,7 @@ func generateJsonSchema(inputFile, outputFolder string, pretty bool) {
 		val = "export const schemas = " + string(marshalled)
 	}
 
-	outputFile, err := os.Create(outputFolder + "/jsonschemas.ts")
+	outputFile, err := os.Create(outputFolder + "/jsonschema.generated.ts")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -173,7 +176,7 @@ func handleRef(ref string, definitions spec.Definitions, order int) *Type {
 
 			for i, v2 := range ordered {
 				t1 := &Type{}
-				t1.PropertyOrder = i
+				t1.PropertyOrder = i + 1
 				t1.Properties = make(map[string]*Type)
 
 				if len(v2.Schema.Type) > 0 {
@@ -184,14 +187,14 @@ func handleRef(ref string, definitions spec.Definitions, order int) *Type {
 							continue
 						}
 						f := splitted[2]
-						t1.Items = handleRef(f, definitions, i)
+						t1.Items = handleRef(f, definitions, i+1)
 					}
 					t.Properties[v2.Name] = t1
 				} else {
 					// is a $ref
 					splitted := strings.Split(v2.Schema.Ref.String(), "/")
 					f := splitted[2]
-					t.Properties[v2.Name] = handleRef(f, definitions, i)
+					t.Properties[v2.Name] = handleRef(f, definitions, i+1)
 				}
 			}
 
