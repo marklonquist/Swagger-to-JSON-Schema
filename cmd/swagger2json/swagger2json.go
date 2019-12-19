@@ -103,10 +103,13 @@ func generateJsonSchema(inputFile, outputFolder string, pretty bool) {
 					t.PropertyOrder += 500
 					splitted := strings.Split(v2.Schema.Items.Schema.Ref.String(), "/")
 					if len(splitted) == 1 {
-						continue
+						t.Items = &Type{
+							Type: v2.Schema.Items.Schema.Type[0],
+						}
+					} else {
+						f := splitted[2]
+						t.Items = handleRef(f, spec.Definitions, i+1)
 					}
-					f := splitted[2]
-					t.Items = handleRef(f, spec.Definitions, i+1)
 				}
 
 				jsonSchema.Properties[v2.Name] = t
@@ -186,10 +189,13 @@ func handleRef(ref string, definitions spec.Definitions, order int) *Type {
 						t1.PropertyOrder += 500
 						splitted := strings.Split(v2.Schema.Items.Schema.Ref.String(), "/")
 						if len(splitted) == 1 {
-							continue
+							t1.Items = &Type{
+								Type: v2.Schema.Items.Schema.Type[0],
+							}
+						} else {
+							f := splitted[2]
+							t1.Items = handleRef(f, definitions, i+1)
 						}
-						f := splitted[2]
-						t1.Items = handleRef(f, definitions, i+1)
 					}
 					t.Properties[v2.Name] = t1
 				} else {
