@@ -53,7 +53,9 @@ type Type struct {
 type Definitions map[string]*Type
 
 type Options struct {
-	EnumTitles []string `json:"enum_titles,omitempty"`
+	EnumTitles  []string `json:"enum_titles,omitempty"`
+	GridColumns int      `json:"grid_columns,omitempty"`
+	GridBreak   bool     `json:"grid_break,omitempty"`
 }
 
 type OrderedType struct {

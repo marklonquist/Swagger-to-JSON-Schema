@@ -59,19 +59,19 @@ func main() {
 func generateJsonSchema(inputFile, outputFolder string, pretty bool) {
 	file, err := os.Open(inputFile)
 	if err != nil {
-		log.Fatal("1", err)
+		log.Fatal(err)
 	}
 	defer file.Close()
 
 	b, err := ioutil.ReadAll(file)
 	if err != nil {
-		log.Fatal("2", err)
+		log.Fatal(err)
 	}
 
 	spec := spec.Swagger{}
 	err = json.Unmarshal(b, &spec)
 	if err != nil {
-		log.Fatal("3", err)
+		log.Fatal(err)
 	}
 
 	result := make(map[string]Schema)
@@ -83,16 +83,7 @@ func generateJsonSchema(inputFile, outputFolder string, pretty bool) {
 		jsonSchema.Title = k
 		jsonSchema.Type.Type = v.Type[0]
 
-		ordered := make([]OrderedType, len(v.Properties))
-		for k2, v2 := range v.Properties {
-			order := int(v2.Extensions["x-position"].(float64))
-			ordered[order] = OrderedType{
-				Name:   k2,
-				Schema: v2,
-			}
-		}
-
-		for i, v2 := range ordered {
+		for i, v2 := range getOrdered(v) {
 			t := &Type{}
 			t.PropertyOrder = i + 1
 
@@ -100,6 +91,10 @@ func generateJsonSchema(inputFile, outputFolder string, pretty bool) {
 				t.Type = v2.Schema.Type[0]
 				if t.Type == "array" {
 					t.Format = "tabs-top"
+					t.Options = &Options{
+						GridColumns: 12,
+						GridBreak:   true,
+					}
 					t.PropertyOrder += 500
 					splitted := strings.Split(v2.Schema.Items.Schema.Ref.String(), "/")
 					if len(splitted) == 1 {
@@ -111,25 +106,19 @@ func generateJsonSchema(inputFile, outputFolder string, pretty bool) {
 						t.Items = handleRef(f, spec.Definitions, i+1)
 					}
 				}
-
-				jsonSchema.Properties[v2.Name] = t
 			} else {
 				// is a $ref
 				splitted := strings.Split(v2.Schema.Ref.String(), "/")
 				f := splitted[2]
-				jsonSchema.Properties[v2.Name] = handleRef(f, spec.Definitions, i+1)
+				t = handleRef(f, spec.Definitions, i+1)
 			}
+
+			jsonSchema.Properties[v2.Name] = t
 		}
 
 		if len(v.Enum) > 0 {
 			// is enum
-			jsonSchema.Enum = make([]interface{}, len(v.Enum))
-			for i, eV := range v.Enum {
-				jsonSchema.Enum[i], _ = strconv.Atoi(eV.(string))
-			}
-			jsonSchema.Options = &Options{}
-			val, _ := v.Extensions.GetStringSlice("x-enumnames")
-			jsonSchema.Options.EnumTitles = val
+			handleEnum(jsonSchema.Type, v)
 		}
 
 		result[k] = jsonSchema
@@ -168,16 +157,14 @@ func handleRef(ref string, definitions spec.Definitions, order int) *Type {
 		if k == ref {
 			t.Type = v.Type[0]
 
-			ordered := make([]OrderedType, len(v.Properties))
-			for k2, v2 := range v.Properties {
-				order := int(v2.Extensions["x-position"].(float64))
-				ordered[order] = OrderedType{
-					Name:   k2,
-					Schema: v2,
+			if t.Type == "object" {
+				t.Options = &Options{
+					GridColumns: 12,
+					GridBreak:   true,
 				}
 			}
 
-			for i, v2 := range ordered {
+			for i, v2 := range getOrdered(v) {
 				t1 := &Type{}
 				t1.PropertyOrder = i + 1
 				t1.Properties = make(map[string]*Type)
@@ -186,6 +173,10 @@ func handleRef(ref string, definitions spec.Definitions, order int) *Type {
 					t1.Type = v2.Schema.Type[0]
 					if t1.Type == "array" {
 						t1.Format = "tabs-top"
+						t1.Options = &Options{
+							GridColumns: 12,
+							GridBreak:   true,
+						}
 						t1.PropertyOrder += 500
 						splitted := strings.Split(v2.Schema.Items.Schema.Ref.String(), "/")
 						if len(splitted) == 1 {
@@ -197,27 +188,44 @@ func handleRef(ref string, definitions spec.Definitions, order int) *Type {
 							t1.Items = handleRef(f, definitions, i+1)
 						}
 					}
-					t.Properties[v2.Name] = t1
 				} else {
 					// is a $ref
 					splitted := strings.Split(v2.Schema.Ref.String(), "/")
 					f := splitted[2]
-					t.Properties[v2.Name] = handleRef(f, definitions, i+1)
+					t1 = handleRef(f, definitions, i+1)
 				}
+
+				t.Properties[v2.Name] = t1
 			}
 
 			if len(v.Enum) > 0 {
 				// is enum
-				t.Enum = make([]interface{}, len(v.Enum))
-				for i, eV := range v.Enum {
-					t.Enum[i], _ = strconv.Atoi(eV.(string))
-				}
-				t.Options = &Options{}
-				val, _ := v.Extensions.GetStringSlice("x-enumnames")
-				t.Options.EnumTitles = val
+				handleEnum(t, v)
 			}
 		}
 	}
 
 	return t
+}
+
+func getOrdered(v spec.Schema) []OrderedType {
+	ordered := make([]OrderedType, len(v.Properties))
+	for k2, v2 := range v.Properties {
+		order := int(v2.Extensions["x-position"].(float64))
+		ordered[order] = OrderedType{
+			Name:   k2,
+			Schema: v2,
+		}
+	}
+	return ordered
+}
+
+func handleEnum(t *Type, v spec.Schema) {
+	t.Enum = make([]interface{}, len(v.Enum))
+	for i, eV := range v.Enum {
+		t.Enum[i], _ = strconv.Atoi(eV.(string))
+	}
+	t.Options = &Options{}
+	val, _ := v.Extensions.GetStringSlice("x-enumnames")
+	t.Options.EnumTitles = val
 }
