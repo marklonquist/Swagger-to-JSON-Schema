@@ -57,6 +57,32 @@ func main() {
 }
 
 func generateJsonSchema(inputFile, outputFolder string, pretty bool) {
+	spec := getSwaggerSpec(inputFile)
+
+	result := make(map[string]Schema)
+	for k, v := range spec.Definitions {
+		jsonSchema := Schema{}
+		jsonSchema.Type = &Type{}
+		jsonSchema.Format = "grid-strict"
+		jsonSchema.Type.Properties = make(map[string]*Type)
+		jsonSchema.Title = k
+		jsonSchema.Type.Type = v.Type[0]
+
+		for i, v2 := range getOrdered(v) {
+			jsonSchema.Properties[v2.Name] = getValue(i, v2, spec.Definitions, "")
+		}
+
+		if len(v.Enum) > 0 {
+			handleEnum(jsonSchema.Type, v)
+		}
+
+		result[k] = jsonSchema
+	}
+
+	doPrint(pretty, result, outputFolder)
+}
+
+func getSwaggerSpec(inputFile string) spec.Swagger {
 	file, err := os.Open(inputFile)
 	if err != nil {
 		log.Fatal(err)
@@ -73,57 +99,10 @@ func generateJsonSchema(inputFile, outputFolder string, pretty bool) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	return spec
+}
 
-	result := make(map[string]Schema)
-	for k, v := range spec.Definitions {
-		jsonSchema := Schema{}
-		jsonSchema.Type = &Type{}
-		jsonSchema.Format = "grid-strict"
-		jsonSchema.Type.Properties = make(map[string]*Type)
-		jsonSchema.Title = k
-		jsonSchema.Type.Type = v.Type[0]
-
-		for i, v2 := range getOrdered(v) {
-			t := &Type{}
-			t.PropertyOrder = i + 1
-
-			if len(v2.Schema.Type) > 0 {
-				t.Type = v2.Schema.Type[0]
-				if t.Type == "array" {
-					t.Format = "tabs-top"
-					t.Options = &Options{
-						GridColumns: 12,
-						GridBreak:   true,
-					}
-					t.PropertyOrder += 500
-					splitted := strings.Split(v2.Schema.Items.Schema.Ref.String(), "/")
-					if len(splitted) == 1 {
-						t.Items = &Type{
-							Type: v2.Schema.Items.Schema.Type[0],
-						}
-					} else {
-						f := splitted[2]
-						t.Items = handleRef(f, spec.Definitions, i+1)
-					}
-				}
-			} else {
-				// is a $ref
-				splitted := strings.Split(v2.Schema.Ref.String(), "/")
-				f := splitted[2]
-				t = handleRef(f, spec.Definitions, i+1)
-			}
-
-			jsonSchema.Properties[v2.Name] = t
-		}
-
-		if len(v.Enum) > 0 {
-			// is enum
-			handleEnum(jsonSchema.Type, v)
-		}
-
-		result[k] = jsonSchema
-	}
-
+func doPrint(pretty bool, result map[string]Schema, outputFolder string) {
 	val := ""
 	if pretty {
 		marshalled, err := json.MarshalIndent(result, "", "	")
@@ -148,71 +127,68 @@ func generateJsonSchema(inputFile, outputFolder string, pretty bool) {
 	outputFile.WriteString(val)
 }
 
-func handleRef(ref string, definitions spec.Definitions, order int) *Type {
+func getValue(i int, v2 *OrderedType, definitions spec.Definitions, ref string) *Type {
 	t := &Type{}
-	t.PropertyOrder = order
-	t.Properties = make(map[string]*Type)
+	t.PropertyOrder = i + 1
 
-	for k, v := range definitions {
-		if k == ref {
-			t.Type = v.Type[0]
+	if ref != "" {
+		t.Properties = make(map[string]*Type)
+		for k, v := range definitions {
+			if k == ref {
+				t.Type = v.Type[0]
 
-			if t.Type == "object" {
+				if t.Type == "object" {
+					t.Options = &Options{
+						GridColumns: 12,
+						GridBreak:   true,
+					}
+				}
+
+				for i, v2 := range getOrdered(v) {
+					t.Properties[v2.Name] = getValue(i, v2, definitions, "")
+				}
+
+				if len(v.Enum) > 0 {
+					handleEnum(t, v)
+				}
+			}
+		}
+	} else {
+		if len(v2.Schema.Type) > 0 {
+			t.Type = v2.Schema.Type[0]
+			if t.Type == "array" {
+				t.Format = "tabs-top"
 				t.Options = &Options{
 					GridColumns: 12,
 					GridBreak:   true,
 				}
-			}
-
-			for i, v2 := range getOrdered(v) {
-				t1 := &Type{}
-				t1.PropertyOrder = i + 1
-				t1.Properties = make(map[string]*Type)
-
-				if len(v2.Schema.Type) > 0 {
-					t1.Type = v2.Schema.Type[0]
-					if t1.Type == "array" {
-						t1.Format = "tabs-top"
-						t1.Options = &Options{
-							GridColumns: 12,
-							GridBreak:   true,
-						}
-						t1.PropertyOrder += 500
-						splitted := strings.Split(v2.Schema.Items.Schema.Ref.String(), "/")
-						if len(splitted) == 1 {
-							t1.Items = &Type{
-								Type: v2.Schema.Items.Schema.Type[0],
-							}
-						} else {
-							f := splitted[2]
-							t1.Items = handleRef(f, definitions, i+1)
-						}
+				t.PropertyOrder += 500
+				splitted := strings.Split(v2.Schema.Items.Schema.Ref.String(), "/")
+				if len(splitted) == 1 {
+					t.Items = &Type{
+						Type: v2.Schema.Items.Schema.Type[0],
 					}
 				} else {
-					// is a $ref
-					splitted := strings.Split(v2.Schema.Ref.String(), "/")
 					f := splitted[2]
-					t1 = handleRef(f, definitions, i+1)
+					t.Items = getValue(i, nil, definitions, f)
 				}
-
-				t.Properties[v2.Name] = t1
 			}
-
-			if len(v.Enum) > 0 {
-				// is enum
-				handleEnum(t, v)
-			}
+		} else {
+			// is a $ref
+			splitted := strings.Split(v2.Schema.Ref.String(), "/")
+			f := splitted[2]
+			t = getValue(i, nil, definitions, f)
 		}
 	}
 
 	return t
 }
 
-func getOrdered(v spec.Schema) []OrderedType {
-	ordered := make([]OrderedType, len(v.Properties))
+func getOrdered(v spec.Schema) []*OrderedType {
+	ordered := make([]*OrderedType, len(v.Properties))
 	for k2, v2 := range v.Properties {
 		order := int(v2.Extensions["x-position"].(float64))
-		ordered[order] = OrderedType{
+		ordered[order] = &OrderedType{
 			Name:   k2,
 			Schema: v2,
 		}

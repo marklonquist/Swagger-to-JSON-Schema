@@ -1,8 +1,10 @@
 package main
 
-import "encoding/json"
+import (
+	"encoding/json"
 
-import "github.com/go-openapi/spec"
+	"github.com/go-openapi/spec"
+)
 
 type Schema struct {
 	*Type
