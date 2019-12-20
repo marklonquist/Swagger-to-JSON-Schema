@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/go-openapi/spec"
 	"github.com/urfave/cli"
@@ -69,7 +70,7 @@ func generateJsonSchema(inputFile, outputFolder string, pretty bool) {
 		jsonSchema.Type.Type = v.Type[0]
 
 		for i, v2 := range getOrdered(v) {
-			jsonSchema.Properties[v2.Name] = getValue(i, v2, spec.Definitions, "")
+			jsonSchema.Properties[v2.Name] = setInputAttributes(v2, getValue(i, v2, spec.Definitions, ""))
 		}
 
 		if len(v.Enum) > 0 {
@@ -127,15 +128,23 @@ func doPrint(pretty bool, result map[string]Schema, outputFolder string) {
 	outputFile.WriteString(val)
 }
 
-func getValue(i int, v2 *OrderedType, definitions spec.Definitions, ref string) *Type {
+func getValue(i int, v *OrderedType, definitions spec.Definitions, ref string) *Type {
 	t := &Type{}
 	t.PropertyOrder = i + 1
 
 	if ref != "" {
 		t.Properties = make(map[string]*Type)
-		for k, v := range definitions {
+		for k, v2 := range definitions {
 			if k == ref {
-				t.Type = v.Type[0]
+				t.Type = v2.Type[0]
+
+				if t.Type == "array" {
+					// check for refs
+					splitted := strings.Split(v2.Items.Schema.Ref.String(), "/")
+					f := splitted[2]
+					t.Items = getValue(i, nil, definitions, f)
+					break
+				}
 
 				if t.Type == "object" {
 					t.Options = &Options{
@@ -144,18 +153,19 @@ func getValue(i int, v2 *OrderedType, definitions spec.Definitions, ref string) 
 					}
 				}
 
-				for i, v2 := range getOrdered(v) {
-					t.Properties[v2.Name] = getValue(i, v2, definitions, "")
+				for i, v3 := range getOrdered(v2) {
+					t.Properties[v3.Name] = setInputAttributes(v3, getValue(i, v3, definitions, ""))
 				}
 
-				if len(v.Enum) > 0 {
-					handleEnum(t, v)
+				if len(v2.Enum) > 0 {
+					handleEnum(t, v2)
 				}
+				break
 			}
 		}
 	} else {
-		if len(v2.Schema.Type) > 0 {
-			t.Type = v2.Schema.Type[0]
+		if len(v.Schema.Type) > 0 {
+			t.Type = v.Schema.Type[0]
 			if t.Type == "array" {
 				t.Format = "tabs-top"
 				t.Options = &Options{
@@ -163,10 +173,10 @@ func getValue(i int, v2 *OrderedType, definitions spec.Definitions, ref string) 
 					GridBreak:   true,
 				}
 				t.PropertyOrder += 500
-				splitted := strings.Split(v2.Schema.Items.Schema.Ref.String(), "/")
+				splitted := strings.Split(v.Schema.Items.Schema.Ref.String(), "/")
 				if len(splitted) == 1 {
 					t.Items = &Type{
-						Type: v2.Schema.Items.Schema.Type[0],
+						Type: v.Schema.Items.Schema.Type[0],
 					}
 				} else {
 					f := splitted[2]
@@ -175,7 +185,7 @@ func getValue(i int, v2 *OrderedType, definitions spec.Definitions, ref string) 
 			}
 		} else {
 			// is a $ref
-			splitted := strings.Split(v2.Schema.Ref.String(), "/")
+			splitted := strings.Split(v.Schema.Ref.String(), "/")
 			f := splitted[2]
 			t = getValue(i, nil, definitions, f)
 		}
@@ -190,7 +200,8 @@ func getOrdered(v spec.Schema) []*OrderedType {
 		order := int(v2.Extensions["x-position"].(float64))
 		ordered[order] = &OrderedType{
 			Name:   k2,
-			Schema: v2,
+			Title:  v2.Description,
+			Schema: &v2,
 		}
 	}
 	return ordered
@@ -204,4 +215,38 @@ func handleEnum(t *Type, v spec.Schema) {
 	t.Options = &Options{}
 	val, _ := v.Extensions.GetStringSlice("x-enumnames")
 	t.Options.EnumTitles = val
+}
+
+func setInputAttributes(v *OrderedType, t *Type) *Type {
+	t.Title = transformName(v.Name)
+
+	if v.Title == "" {
+		return t
+	}
+	if t.Options == nil {
+		t.Options = &Options{
+			InputAttributes: &InputAttributes{},
+		}
+	} else if t.Options.InputAttributes == nil {
+		t.Options.InputAttributes = &InputAttributes{}
+	}
+	t.Options.InputAttributes.Title = v.Title
+	return t
+}
+
+func transformName(name string) string {
+	result := ""
+	for i, r := range name {
+		if i == 0 {
+			r = unicode.ToUpper(r)
+		} else if unicode.IsUpper(r) {
+			if !unicode.IsUpper(rune(name[i-1])) {
+				result += " " + string(r)
+				continue
+			}
+		}
+
+		result += string(r)
+	}
+	return result
 }
