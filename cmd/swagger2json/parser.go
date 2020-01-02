@@ -40,6 +40,15 @@ func getValue(i int, o OrderedType, definitions spec.Definitions) *Type {
 	if o.Ref != "" {
 		for k, v := range definitions {
 			if k == o.Ref {
+				if v.Type[0] == "array" {
+					ref := splitRef(v.Items.Schema.Ref.String())
+					for k1, v1 := range definitions {
+						if k1 == ref {
+							v = v1
+							break
+						}
+					}
+				}
 				t.Properties = make(map[string]*Type)
 				for i, v2 := range getProperties(v) {
 					t.Properties[v2.Name] = setInputAttributes(v2, getValue(i, v2, definitions))
@@ -58,6 +67,7 @@ func getValue(i int, o OrderedType, definitions spec.Definitions) *Type {
 
 	if o.Type == "array" {
 		t.Format = "tabs-top"
+		t.PropertyOrder += 500
 		if o.Schema.Items.Schema.Ref.String() != "" {
 			splitted := strings.Split(o.Schema.Items.Schema.Ref.String(), "/")
 			for k, v := range definitions {

@@ -119,9 +119,13 @@ func getProperties(v spec.Schema) []OrderedType {
 			ordered[order].Type = v2.Type[0]
 		}
 		if ordered[order].Ref != "" {
-			splitted := strings.Split(ordered[order].Ref, "/")
-			ordered[order].Ref = splitted[2]
+			ordered[order].Ref = splitRef(ordered[order].Ref)
 		}
 	}
 	return ordered
+}
+
+func splitRef(ref string) string {
+	splitted := strings.Split(ref, "/")
+	return splitted[2]
 }
