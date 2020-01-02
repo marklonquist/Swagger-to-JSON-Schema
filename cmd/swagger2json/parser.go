@@ -40,6 +40,8 @@ func getValue(i int, o OrderedType, definitions spec.Definitions) *Type {
 			if k == o.Ref {
 				t.Type = v.Type[0]
 				if v.Type[0] == "array" {
+					t.Format = "tabs-top"
+					t.PropertyOrder += 500
 					ref := splitRef(v.Items.Schema.Ref.String())
 					for k1, v1 := range definitions {
 						if k1 == ref {
