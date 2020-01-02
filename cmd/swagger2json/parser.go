@@ -1,8 +1,6 @@
 package main
 
 import (
-	"strings"
-
 	"github.com/go-openapi/spec"
 )
 
@@ -45,10 +43,11 @@ func getValue(i int, o OrderedType, definitions spec.Definitions) *Type {
 					ref := splitRef(v.Items.Schema.Ref.String())
 					for k1, v1 := range definitions {
 						if k1 == ref {
-							v = v1
+							t.Items = handleArray(v1, definitions)
 							break
 						}
 					}
+					break
 				}
 				t.Properties = make(map[string]*Type)
 				for i, v2 := range getProperties(v) {
@@ -69,17 +68,9 @@ func getValue(i int, o OrderedType, definitions spec.Definitions) *Type {
 		t.Format = "tabs-top"
 		t.PropertyOrder += 500
 		if o.Schema.Items.Schema.Ref.String() != "" {
-			splitted := strings.Split(o.Schema.Items.Schema.Ref.String(), "/")
 			for k, v := range definitions {
-				if k == splitted[2] {
-					t2 := &Type{
-						Type:       v.Type[0],
-						Properties: make(map[string]*Type),
-					}
-					for i, v2 := range getProperties(v) {
-						t2.Properties[v2.Name] = setInputAttributes(v2, getValue(i, v2, definitions))
-					}
-					t.Items = t2
+				if k == splitRef(o.Schema.Items.Schema.Ref.String()) {
+					t.Items = handleArray(v, definitions)
 				}
 			}
 		} else {

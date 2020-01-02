@@ -129,3 +129,14 @@ func splitRef(ref string) string {
 	splitted := strings.Split(ref, "/")
 	return splitted[2]
 }
+
+func handleArray(v spec.Schema, definitions spec.Definitions) *Type {
+	t := &Type{
+		Type:       v.Type[0],
+		Properties: make(map[string]*Type),
+	}
+	for i, v2 := range getProperties(v) {
+		t.Properties[v2.Name] = setInputAttributes(v2, getValue(i, v2, definitions))
+	}
+	return t
+}
