@@ -40,6 +40,7 @@ func getValue(i int, o OrderedType, definitions spec.Definitions) *Type {
 	if o.Ref != "" {
 		for k, v := range definitions {
 			if k == o.Ref {
+				t.Type = v.Type[0]
 				if v.Type[0] == "array" {
 					ref := splitRef(v.Items.Schema.Ref.String())
 					for k1, v1 := range definitions {
@@ -56,7 +57,6 @@ func getValue(i int, o OrderedType, definitions spec.Definitions) *Type {
 				if len(v.Enum) > 0 {
 					handleEnum(t, v)
 				}
-				t.Type = v.Type[0]
 			}
 		}
 	}
