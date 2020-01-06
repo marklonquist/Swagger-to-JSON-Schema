@@ -6,11 +6,6 @@ import (
 	"github.com/go-openapi/spec"
 )
 
-type Schema struct {
-	*Type
-	Definitions Definitions `json:"definitions,omitempty"`
-}
-
 type Type struct {
 	Title                string           `json:"title,omitempty"`
 	Type                 string           `json:"type,omitempty"`
@@ -68,5 +63,7 @@ type InputAttributes struct {
 type OrderedType struct {
 	Name   string
 	Title  string
-	Schema *spec.Schema
+	Ref    string
+	Type   string
+	Schema spec.Schema
 }
