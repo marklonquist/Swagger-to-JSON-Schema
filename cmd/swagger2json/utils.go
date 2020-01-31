@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"strconv"
 	"strings"
 	"unicode"
 
@@ -64,7 +63,7 @@ func doPrint(result map[string]*Type, outputFolder string, pretty bool) {
 func handleEnum(t *Type, v spec.Schema) {
 	t.Enum = make([]interface{}, len(v.Enum))
 	for i, eV := range v.Enum {
-		t.Enum[i], _ = strconv.Atoi(eV.(string))
+		t.Enum[i], _ = eV.(float64)
 	}
 	t.Options = &Options{}
 	val, _ := v.Extensions.GetStringSlice("x-enumnames")
