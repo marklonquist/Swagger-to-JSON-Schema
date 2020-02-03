@@ -51,6 +51,9 @@ func getValue(i int, o OrderedType, definitions spec.Definitions) *Type {
 					}
 					break
 				}
+				if v.Type[0] == "object" {
+					t.PropertyOrder += 250
+				}
 				t.Properties = make(map[string]*Type)
 				for i, v2 := range getProperties(v) {
 					t.Properties[v2.Name] = setInputAttributes(v2, getValue(i, v2, definitions))
