@@ -54,6 +54,7 @@ type Options struct {
 	GridColumns     int              `json:"grid_columns,omitempty"`
 	GridBreak       bool             `json:"grid_break,omitempty"`
 	InputAttributes *InputAttributes `json:"inputAttributes,omitempty"`
+	Hidden          bool             `json:"hidden,omitempty"`
 }
 
 type InputAttributes struct {
@@ -65,5 +66,6 @@ type OrderedType struct {
 	Title  string
 	Ref    string
 	Type   string
+	Hidden bool
 	Schema spec.Schema
 }

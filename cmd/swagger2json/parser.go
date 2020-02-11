@@ -92,5 +92,13 @@ func getValue(i int, o OrderedType, definitions spec.Definitions) *Type {
 		}
 	}
 
+	if o.Hidden {
+		if t.Options == nil {
+			t.Options = &Options{}
+		}
+
+		t.Options.Hidden = true
+	}
+
 	return t
 }

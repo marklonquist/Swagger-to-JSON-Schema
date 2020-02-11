@@ -65,7 +65,9 @@ func handleEnum(t *Type, v spec.Schema) {
 	for i, eV := range v.Enum {
 		t.Enum[i], _ = eV.(float64)
 	}
-	t.Options = &Options{}
+	if t.Options == nil {
+		t.Options = &Options{}
+	}
 	val, _ := v.Extensions.GetStringSlice("x-enumnames")
 	t.Options.EnumTitles = val
 }
@@ -107,16 +109,16 @@ func transformName(name string) string {
 func getProperties(v spec.Schema) []OrderedType {
 	ordered := make([]OrderedType, len(v.Properties))
 	for k2, v2 := range v.Properties {
-		ignored := bool(v2.Extensions["x-datastore-ignore"].(bool))
-		if ignored {
-			continue
-		}
 		order := int(v2.Extensions["x-position"].(float64))
 		ordered[order] = OrderedType{
 			Name:   k2,
 			Title:  v2.Description,
 			Ref:    v2.Ref.String(),
 			Schema: v2,
+		}
+		hidden := bool(v2.Extensions["x-hidden"].(bool))
+		if hidden {
+			ordered[order].Hidden = hidden
 		}
 		if len(v2.Type) > 0 {
 			ordered[order].Type = v2.Type[0]
