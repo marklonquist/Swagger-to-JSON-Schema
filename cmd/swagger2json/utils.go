@@ -107,6 +107,10 @@ func transformName(name string) string {
 func getProperties(v spec.Schema) []OrderedType {
 	ordered := make([]OrderedType, len(v.Properties))
 	for k2, v2 := range v.Properties {
+		ignored := bool(v2.Extensions["x-datastore-ignore"].(bool))
+		if ignored {
+			continue
+		}
 		order := int(v2.Extensions["x-position"].(float64))
 		ordered[order] = OrderedType{
 			Name:   k2,
