@@ -13,6 +13,9 @@ func generateJSONSchema(inputFile, outputFolder string, pretty bool) {
 		t.Format = "grid-strict"
 		t.Properties = make(map[string]*Type)
 		t.Title = k
+		if len(v.Type) == 0 {
+			continue
+		}
 		t.Type = v.Type[0]
 
 		for i, v2 := range getProperties(v) {
